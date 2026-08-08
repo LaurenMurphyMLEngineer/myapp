@@ -1,0 +1,5 @@
+<h1>Scan a Receipt</h1>
+<%= form_with model: @receipt, multipart: true do |f| %>
+  <%= f.file_field :image, accept: "image/*" %>
+  <%= f.submit "Scan" %>
+<% end %>

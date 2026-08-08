@@ -1,0 +1,13 @@
+<h1>Receipt</h1>
+<%= image_tag @receipt.image, style: "max-width: 300px" if @receipt.image.attached? %>
+
+<p><strong>Merchant:</strong> <%= @receipt.merchant %></p>
+<p><strong>Total:</strong> <%= number_to_currency(@receipt.total) if @receipt.total %></p>
+<p><strong>Date:</strong> <%= @receipt.purchased_on %></p>
+
+<details>
+  <summary>Raw OCR text</summary>
+  <pre><%= @receipt.raw_text %></pre>
+</details>
+
+<%= link_to "← All receipts", receipts_path %>
