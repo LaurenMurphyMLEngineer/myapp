@@ -2,6 +2,9 @@
 <%= link_to "Scan a new receipt", new_receipt_path %>
 <ul>
   <% @receipts.each do |receipt| %>
-    <li><%= link_to "#{receipt.merchant || 'Unknown'} — #{number_to_currency(receipt.total) if receipt.total}", receipt_path(receipt) %></li>
+    <li>
+      <%= link_to "#{receipt.merchant || 'Unknown'} — #{number_to_currency(receipt.total) if receipt.total}", receipt_path(receipt) %>
+      <% if receipt.category.present? %><span>(<%= receipt.category %>)</span><% end %>
+    </li>
   <% end %>
 </ul>

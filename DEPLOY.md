@@ -1,83 +1,81 @@
 # Deploying myapp to Render
 
-This app scans uploaded receipt images with OCR.space (no local binary
-needed) and stores images in Supabase Storage (S3-compatible), so it can
-run on Render's native Ruby build (no Docker required).
+**Live at:** https://myapp-lqcq.onrender.com
 
-## 1. Supabase — storage bucket + keys
+This app extracts structured data (merchant, total, date, category) from
+uploaded receipt photos using Claude's vision + tool-use API, and stores
+images in Supabase Storage (S3-compatible). It runs on Render's native Ruby
+build (no Docker required).
+
+## 1. Supabase — storage bucket + keys (done)
 
 Project: https://zffxswttavrsddvuovpx.supabase.co
 
-1. In the Supabase dashboard, go to **Storage** and create a bucket named
-   `receipts` (private is fine — Active Storage generates signed URLs).
-2. Go to **Storage → S3 Connection** (sometimes under Project Settings) and
-   generate an **Access Key ID** / **Secret Access Key** pair for the S3
-   protocol. Note the **region** shown there too (commonly `us-east-1`).
-3. Keep these three values handy for step 4: access key id, secret access
-   key, region.
+The `receipts` bucket already exists. S3 access keys were generated under
+**Storage → S3 Connection** in the Supabase dashboard and are set as env
+vars on Render (see the table below) — not stored in this repo.
 
-## 2. OCR.space — free API key
+## 2. Anthropic — API key for receipt scanning
 
-1. Get a free key at https://ocr.space/ocrapi/freekey (25,000 requests/month
-   free tier).
-2. Keep the key handy for step 4.
+1. Get an API key at https://console.anthropic.com (Settings → API Keys).
+2. Set it as `ANTHROPIC_API_KEY` on the Render web service (see step 4).
+3. Optional: `CLAUDE_MODEL` env var overrides the default model
+   (`claude-haiku-4-5-20251001`) if you want to try a different one, e.g.
+   `claude-sonnet-5` for higher accuracy at higher cost.
 
-## 3. Push the code
+## 3. Push code changes
 
-On your own machine, in the `myapp` folder:
+Whenever you change the app, from the `myapp` folder on your machine:
 
 ```bash
-bundle install          # regenerates Gemfile.lock (drops rtesseract, adds aws-sdk-s3)
+bundle install   # only needed if the Gemfile changed
 git add -A
-git commit -m "Switch OCR to OCR.space and storage to Supabase for Render"
-git remote -v           # check if 'origin' is already set
-# if not already set:
-git remote add origin https://github.com/LaurenMurphyMLEngineer/myapp.git
-git branch -M main      # only if your default branch isn't already named main
-git push -u origin main
+git commit -m "Describe the change"
+git push
 ```
 
-## 4. Render — database + web service
+Render auto-deploys on every push to `main` (Deploys tab on the web service
+shows progress).
 
-**Database:**
-1. New → PostgreSQL. Note the connection string it gives you (or link it to
-   the web service below in the same project so `DATABASE_URL` is wired
-   automatically).
+## 4. Render — environment variables
 
-**Web service:**
-1. New → Web Service → connect the `myapp` GitHub repo.
-2. Environment: **Ruby** (native, not Docker).
-3. Build command: `./bin/render-build.sh`
-4. Start command: `bin/rails server`
-5. Add these environment variables:
+Web service → **Environment** tab should have:
 
-   | Key | Value |
-   |---|---|
-   | `RAILS_MASTER_KEY` | contents of `config/master.key` |
-   | `DATABASE_URL` | from the Postgres instance (auto-filled if linked) |
-   | `OCR_SPACE_API_KEY` | key from step 2 |
-   | `SUPABASE_ACCESS_KEY_ID` | access key from step 1 |
-   | `SUPABASE_SECRET_ACCESS_KEY` | secret key from step 1 |
-   | `SUPABASE_BUCKET` | `receipts` |
-   | `SUPABASE_REGION` | region from step 1 (e.g. `us-east-1`) |
+| Key | Value |
+|---|---|
+| `RAILS_MASTER_KEY` | contents of `config/master.key` |
+| `DATABASE_URL` | Internal Database URL from the Postgres instance |
+| `WEB_CONCURRENCY` | `2` |
+| `ANTHROPIC_API_KEY` | key from step 2 |
+| `SUPABASE_ACCESS_KEY_ID` | access key from Supabase Storage → S3 Connection |
+| `SUPABASE_SECRET_ACCESS_KEY` | secret key from Supabase Storage → S3 Connection |
+| `SUPABASE_BUCKET` | `receipts` |
+| `SUPABASE_REGION` | `us-west-2` |
 
-   (`SUPABASE_STORAGE_ENDPOINT` doesn't need to be set — it already defaults
-   to your project's endpoint in `config/storage.yml`.)
+`OCR_SPACE_API_KEY` is no longer used and can be removed if present.
 
-6. Deploy. Render runs `bin/render-build.sh` (bundle install, precompile
-   assets, `db:prepare` — creates and migrates the primary DB plus the
-   solid_cache/solid_queue/solid_cable tables in one step) then starts Puma.
+Build command: `./bin/render-build.sh` — installs gems, precompiles assets,
+runs `db:prepare`, and explicitly backfills the solid_cache/solid_queue/
+solid_cable schemas if `db:prepare` skipped them (a known quirk when those
+roles share one physical Postgres database with `primary`).
+
+Start command: `bin/rails server`
+
+After adding/changing an env var, Render usually needs a manual "Deploy
+latest commit" to pick it up — saving the variable alone doesn't always
+trigger a fresh deploy.
 
 ## 5. Try it
 
-Once the deploy is live, open the Render URL from your phone (or any
-device on the web), go to `/receipts/new`, and upload a photo of a
-receipt.
+Open the live URL from any device and go to `/receipts/new` to upload a
+photo.
 
 ## Notes
 
 - `Dockerfile`, `.kamal/`, and `config/deploy.yml` are left in the repo but
-  unused by this Render deploy (they're for a Docker/Kamal-based deploy
-  path, which was set aside in favor of Render's native Ruby build).
+  unused by this Render deploy.
 - Local development still stores files on local disk (see the `local:`
-  service in `config/storage.yml`) — only production uses Supabase.
+  service in `config/storage.yml`) and doesn't require `ANTHROPIC_API_KEY`
+  unless you're testing the scanner locally.
+- Render's free Postgres instance expires after 30 days — upgrade to a paid
+  instance before then if you want to keep the data.
