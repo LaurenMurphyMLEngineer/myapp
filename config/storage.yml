@@ -25,3 +25,15 @@ local:
 #   service: Mirror
 #   primary: local
 #   mirrors: [ amazon, google, microsoft ]
+
+# Supabase Storage (S3-compatible). Create a bucket in the Supabase dashboard
+# (Storage), then generate S3 access keys under Storage > S3 Connection.
+# Set these as environment variables on Render (do not commit real values).
+supabase:
+  service: S3
+  endpoint: <%= ENV.fetch("SUPABASE_STORAGE_ENDPOINT", "https://zffxswttavrsddvuovpx.supabase.co/storage/v1/s3") %>
+  region: <%= ENV.fetch("SUPABASE_REGION", "us-east-1") %>
+  bucket: <%= ENV.fetch("SUPABASE_BUCKET", "receipts") %>
+  access_key_id: <%= ENV.fetch("SUPABASE_ACCESS_KEY_ID") %>
+  secret_access_key: <%= ENV.fetch("SUPABASE_SECRET_ACCESS_KEY") %>
+  force_path_style: true
