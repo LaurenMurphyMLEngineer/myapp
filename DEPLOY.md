@@ -51,8 +51,18 @@ Web service → **Environment** tab should have:
 | `SUPABASE_SECRET_ACCESS_KEY` | secret key from Supabase Storage → S3 Connection |
 | `SUPABASE_BUCKET` | `receipts` |
 | `SUPABASE_REGION` | `us-west-2` |
+| `ADMIN_EMAIL` | the email you want to log in with |
+| `ADMIN_PASSWORD` | the password you want to log in with |
 
 `OCR_SPACE_API_KEY` is no longer used and can be removed if present.
+
+The app now requires login (added via Rails 8's built-in `bin/rails generate
+authentication`). `ADMIN_EMAIL`/`ADMIN_PASSWORD` create your one account via
+`db:seed` on first deploy — only if no user exists yet, so it's safe to
+leave those vars set permanently. There's no public sign-up page by design
+(this is a single-user app); to add another user later, set new values and
+manually create one via `bin/rails console` on Render's Shell, or extend
+`db/seeds.rb`.
 
 Build command: `./bin/render-build.sh` — installs gems, precompiles assets,
 runs `db:prepare`, and explicitly backfills the solid_cache/solid_queue/

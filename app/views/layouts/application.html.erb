@@ -24,6 +24,13 @@
   </head>
 
   <body>
+    <% if authenticated? %>
+      <nav style="display:flex; justify-content:space-between; align-items:center;">
+        <span><%= Current.user.email_address %></span>
+        <%= button_to "Sign out", session_path, method: :delete %>
+      </nav>
+    <% end %>
+
     <%= yield %>
   </body>
 </html>

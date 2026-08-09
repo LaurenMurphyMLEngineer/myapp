@@ -35,3 +35,5 @@ end
 
 ActiveRecord::Base.establish_connection(:primary)
 RUBY
+
+bin/rails db:seed
