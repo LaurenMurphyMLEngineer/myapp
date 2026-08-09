@@ -3,7 +3,7 @@
 **Live at:** https://myapp-lqcq.onrender.com
 
 This app extracts structured data (merchant, total, date, category) from
-uploaded receipt photos using Claude's vision + tool-use API, and stores
+uploaded receipt photos using Google's Gemini API (free tier), and stores
 images in Supabase Storage (S3-compatible). It runs on Render's native Ruby
 build (no Docker required).
 
@@ -15,13 +15,16 @@ The `receipts` bucket already exists. S3 access keys were generated under
 **Storage → S3 Connection** in the Supabase dashboard and are set as env
 vars on Render (see the table below) — not stored in this repo.
 
-## 2. Anthropic — API key for receipt scanning
+## 2. Gemini — free API key for receipt scanning
 
-1. Get an API key at https://console.anthropic.com (Settings → API Keys).
-2. Set it as `ANTHROPIC_API_KEY` on the Render web service (see step 4).
-3. Optional: `CLAUDE_MODEL` env var overrides the default model
-   (`claude-haiku-4-5-20251001`) if you want to try a different one, e.g.
-   `claude-sonnet-5` for higher accuracy at higher cost.
+1. Get a free key at https://aistudio.google.com/apikey — no credit card
+   required for the free tier.
+2. Set it as `GEMINI_API_KEY` on the Render web service (see step 4).
+3. Optional: `GEMINI_MODEL` env var overrides the default model
+   (`gemini-3.6-flash`) if you want to try a different one.
+4. Note: free-tier requests may be used by Google to improve their models
+   (unlike paid-tier usage), worth keeping in mind since receipts contain
+   personal spending data.
 
 ## 3. Push code changes
 
@@ -46,7 +49,7 @@ Web service → **Environment** tab should have:
 | `RAILS_MASTER_KEY` | contents of `config/master.key` |
 | `DATABASE_URL` | Internal Database URL from the Postgres instance |
 | `WEB_CONCURRENCY` | `2` |
-| `ANTHROPIC_API_KEY` | key from step 2 |
+| `GEMINI_API_KEY` | key from step 2 |
 | `SUPABASE_ACCESS_KEY_ID` | access key from Supabase Storage → S3 Connection |
 | `SUPABASE_SECRET_ACCESS_KEY` | secret key from Supabase Storage → S3 Connection |
 | `SUPABASE_BUCKET` | `receipts` |
@@ -85,7 +88,7 @@ photo.
 - `Dockerfile`, `.kamal/`, and `config/deploy.yml` are left in the repo but
   unused by this Render deploy.
 - Local development still stores files on local disk (see the `local:`
-  service in `config/storage.yml`) and doesn't require `ANTHROPIC_API_KEY`
+  service in `config/storage.yml`) and doesn't require `GEMINI_API_KEY`
   unless you're testing the scanner locally.
 - Render's free Postgres instance expires after 30 days — upgrade to a paid
   instance before then if you want to keep the data.

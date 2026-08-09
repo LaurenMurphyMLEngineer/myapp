@@ -4,28 +4,24 @@ require "json"
 require "base64"
 
 # Extracts structured data (merchant, total, purchase date, spending
-# category) from a photo of a receipt using Claude's vision + tool-use
-# capability. Requires ANTHROPIC_API_KEY to be set in the environment.
-# Get a key at https://console.anthropic.com
+# category) from a photo of a receipt using Google's Gemini API
+# (Interactions API), which has a genuine free tier. Requires
+# GEMINI_API_KEY to be set in the environment. Get a free key at
+# https://aistudio.google.com/apikey
 class ReceiptScanner
-  API_URL = "https://api.anthropic.com/v1/messages"
-  ANTHROPIC_VERSION = "2023-06-01"
+  API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
   CATEGORIES = %w[Groceries Dining Transportation Shopping Entertainment Utilities Health Travel Other].freeze
 
-  TOOL = {
-    name: "record_receipt",
-    description: "Record structured data extracted from a photo of a receipt.",
-    input_schema: {
-      type: "object",
-      properties: {
-        merchant: { type: %w[string null], description: "The store or business name" },
-        total: { type: %w[number null], description: "The final total amount charged, as a plain number" },
-        purchased_on: { type: %w[string null], description: "The purchase date, formatted as YYYY-MM-DD" },
-        category: { type: %w[string null], enum: CATEGORIES, description: "Best-fit spending category" },
-        raw_text: { type: "string", description: "All legible text on the receipt, transcribed as-is" }
-      },
-      required: ["raw_text"]
-    }
+  SCHEMA = {
+    type: "object",
+    properties: {
+      merchant: { type: "string", description: "The store or business name" },
+      total: { type: "number", description: "The final total amount charged, as a plain number" },
+      purchased_on: { type: "string", description: "The purchase date, formatted as YYYY-MM-DD" },
+      category: { type: "string", enum: CATEGORIES, description: "Best-fit spending category" },
+      raw_text: { type: "string", description: "All legible text on the receipt, transcribed as-is" }
+    },
+    required: ["raw_text"]
   }.freeze
 
   def initialize(image_path, content_type: "image/jpeg")
@@ -34,7 +30,7 @@ class ReceiptScanner
   end
 
   def extract
-    result = call_claude
+    result = call_gemini
 
     {
       raw_text: result["raw_text"].to_s,
@@ -50,27 +46,23 @@ class ReceiptScanner
 
   private
 
-  def call_claude
+  def call_gemini
     uri = URI(API_URL)
     request = Net::HTTP::Post.new(uri)
-    request["x-api-key"] = ENV.fetch("ANTHROPIC_API_KEY")
-    request["anthropic-version"] = ANTHROPIC_VERSION
+    request["x-goog-api-key"] = ENV.fetch("GEMINI_API_KEY")
     request["content-type"] = "application/json"
 
     request.body = {
-      model: ENV.fetch("CLAUDE_MODEL", "claude-haiku-4-5-20251001"),
-      max_tokens: 1024,
-      tools: [TOOL],
-      tool_choice: { type: "tool", name: "record_receipt" },
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "image", source: { type: "base64", media_type: @content_type, data: encoded_image } },
-            { type: "text", text: "Extract this receipt's data using the record_receipt tool." }
-          ]
-        }
-      ]
+      model: ENV.fetch("GEMINI_MODEL", "gemini-3.6-flash"),
+      input: [
+        { type: "text", text: "Extract this receipt's data." },
+        { type: "image", data: encoded_image, mime_type: @content_type }
+      ],
+      response_format: {
+        type: "text",
+        mime_type: "application/json",
+        schema: SCHEMA
+      }
     }.to_json
 
     response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true, read_timeout: 60) do |http|
@@ -78,12 +70,15 @@ class ReceiptScanner
     end
 
     body = JSON.parse(response.body)
-    raise "Claude API error: #{body["error"]}" if body["error"]
+    raise "Gemini API error: #{body['error']}" if body["error"]
 
-    tool_use = body["content"]&.find { |block| block["type"] == "tool_use" }
-    raise "No tool_use block in Claude response: #{body.inspect}" unless tool_use
+    model_output = body["steps"]&.find { |step| step["type"] == "model_output" }
+    raise "No model_output step in Gemini response: #{body.inspect}" unless model_output
 
-    tool_use["input"]
+    text_block = model_output["content"]&.find { |block| block["type"] == "text" }
+    raise "No text content in Gemini response: #{body.inspect}" unless text_block
+
+    JSON.parse(text_block["text"])
   end
 
   def encoded_image

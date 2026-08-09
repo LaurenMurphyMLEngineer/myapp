@@ -1,10 +1,33 @@
 <h1>Receipts</h1>
-<%= link_to "Scan a new receipt", new_receipt_path %>
-<ul>
-  <% @receipts.each do |receipt| %>
-    <li>
-      <%= link_to "#{receipt.merchant || 'Unknown'} — #{number_to_currency(receipt.total) if receipt.total}", receipt_path(receipt) %>
-      <% if receipt.category.present? %><span>(<%= receipt.category %>)</span><% end %>
-    </li>
-  <% end %>
-</ul>
+<p><%= link_to "Scan a new receipt", new_receipt_path %></p>
+
+<% if @receipts.any? %>
+  <table class="receipts-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Merchant</th>
+        <th>Category</th>
+        <th class="numeric">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @receipts.each do |receipt| %>
+        <tr>
+          <td><%= link_to (receipt.purchased_on || "Unknown date"), receipt_path(receipt) %></td>
+          <td><%= receipt.merchant.presence || "Unknown" %></td>
+          <td><%= receipt.category.presence || "—" %></td>
+          <td class="numeric"><%= receipt.total ? number_to_currency(receipt.total) : "—" %></td>
+        </tr>
+      <% end %>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="3">Total</td>
+        <td class="numeric"><%= number_to_currency(@receipts.sum(:total)) %></td>
+      </tr>
+    </tfoot>
+  </table>
+<% else %>
+  <p>No receipts yet — <%= link_to "scan your first one", new_receipt_path %>.</p>
+<% end %>
